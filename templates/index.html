@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Предсказание качества товарного продукта</title>
+    <style>
+        /* Общие стили */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #1a2a3a;
+            color: #eee;
+        }
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 30px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #3498db;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 24px;
+            text-decoration: none;
+            color: #ccc;
+            background: #2c3e50;
+            border-radius: 8px 8px 0 0;
+            margin-right: 4px;
+            transition: 0.2s;
+        }
+        .tab:hover {
+            background: #3a5068;
+            color: #fff;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+            pointer-events: none;
+        }
+        .content {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            min-height: 300px;
+            color: #333;
+        }
+
+        .upload-block {
+            background: #ecf0f1;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            color: #2c3e50;
+        }
+        .upload-block label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .upload-block input[type="file"] {
+            margin-bottom: 15px;
+        }
+        .upload-block input[type="number"] {
+            width: 80px;
+            padding: 5px;
+        }
+        .upload-block button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .upload-block button:hover {
+            background: #2980b9;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .data-table th {
+            background: #f2f2f2;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        .error-msg {
+            color: red;
+            margin-bottom: 15px;
+        }
+
+        .result-block {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .result-block h3 {
+            margin-top: 0;
+        }
+        .best-worst {
+            display: flex;
+            gap: 20px;
+        }
+        .best-worst > div {
+            flex: 1;
+        }
+
+        .histograms-block {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+            color: #2c3e50;
+        }
+        .histograms-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .chart-selector {
+            margin-bottom: 15px;
+        }
+        .chart-selector label {
+            font-weight: bold;
+            margin-right: 10px;
+            color: #2c3e50;
+        }
+        .chart-selector select {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .chart-scroll {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        .chart-scroll canvas {
+            display: block;
+        }
+
+        .success-msg {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .train-controls {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 20px;
+        }
+        .train-left, .train-right {
+            flex: 1;
+        }
+        .range-slider input[type=range] {
+            width: 100%;
+            display: block;
+            margin: 5px 0;
+        }
+        .range-values {
+            text-align: center;
+            font-weight: bold;
+        }
+        .stats-table table {
+            width: auto;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .stats-table th, .stats-table td {
+            border: 1px solid #ccc;
+            padding: 5px 10px;
+        }
+        .btn-train {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .btn-train:hover {
+            background: #218838;
+        }
+        .btn-predict {
+            background: #8e44ad;
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .btn-predict:hover {
+            background: #7d3c98;
+        }
+        .btn-predict-disabled {
+            background: #ccc;
+            color: #666;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: not-allowed;
+        }
+        .predict-results h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .metrics-block {
+            margin-top: 25px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            color: #333;
+        }
+        .metrics-table {
+            width: auto;
+            border-collapse: collapse;
+        }
+        .metrics-table th, .metrics-table td {
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+        }
+        .btn-download {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1em;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .btn-download:hover {
+            background: #218838;
+        }
+
+        .btn-clear {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            font-size: 1em;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .btn-clear:hover {
+            background: #c82333;
+        }
+
+        .welcome-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #2c2c2c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+        }
+        .welcome-container {
+            text-align: center;
+            color: white;
+        }
+        .welcome-title {
+            font-size: 4.5em;
+            color: #9b59b6;
+            margin-bottom: 0.3em;
+            font-weight: bold;
+        }
+        .welcome-text {
+            font-size: 1.5em;
+            margin-bottom: 1.5em;
+            color: #ddd;
+        }
+        .btn-start {
+            background: white;
+            color: black;
+            font-size: 1.5em;
+            padding: 15px 50px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-start:hover {
+            background: #f0f0f0;
+        }
+
+        /* Стили футера */
+        .site-footer {
+            background: #000000;
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 300px;
+            margin-top: 30px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        .footer-left p {
+            margin: 5px 0;
+        }
+        .footer-warning {
+            background: #555555;
+            color: rgb(255, 255, 255);
+            padding: 10px 15px;
+            border-radius: 6px;
+            max-width: 400px;   
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    {% if show_welcome %}
+    <!-- Экран приветствия -->
+    <div class="welcome-overlay">
+        <div class="welcome-container">
+            <h1 class="welcome-title">Приветствую!</h1>
+            <p class="welcome-text">Я бот-предсказатель качества товарного продукта. Нажмите кнопку, чтобы начать</p>
+            <form method="post" action="/start">
+                <button type="submit" class="btn-start">Начать!</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <!-- Основное приложение (показывается после старта) -->
+    <h1>Предсказание качества товарного продукта</h1>
+
+    <div class="tabs">
+        <a href="/data" class="tab {% if active_tab == 'data' %}active{% endif %}">Данные</a>
+        <a href="/analytics" class="tab {% if active_tab == 'analytics' %}active{% endif %}">Аналитика</a>
+        <a href="/train" class="tab {% if active_tab == 'train' %}active{% endif %}">Обучение</a>
+        <a href="/predict" class="tab {% if active_tab == 'predict' %}active{% endif %}">Предсказания</a>
+        <a href="/logs" class="tab {% if active_tab == 'logs' %}active{% endif %}">Логи</a>
+    </div>
+
+    <div class="content">
+        <!-- ========== Вкладка ДАННЫЕ ========== -->
+        {% if active_tab == 'data' %}
+            {% if error %}
+                <div class="error-msg">{{ error }}</div>
+            {% endif %}
+
+            <div class="upload-block">
+                <form method="post" action="/data" enctype="multipart/form-data">
+                    <label for="file">Загрузите CSV-файл:</label>
+                    <input type="file" id="file" name="file" accept=".csv" required>
+                    <label for="n">Количество строк для отображения:</label>
+                    <input type="number" id="n" name="n" value="{{ n if n else 5 }}" min="1">
+                    <button type="submit">Загрузить и показать</button>
+                </form>
+            </div>
+
+            {% if headers and rows %}
+                <h3>Результат для файла «{{ filename }}» (первые {{ rows|length }} строк)</h3>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                {% for h in headers %}
+                                    <th>{{ h }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in rows %}
+                                <tr>
+                                    {% for cell in row %}
+                                        <td>{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="histograms-block">
+                    <div class="histograms-title">Наглядное представление информации</div>
+                    <div class="chart-selector">
+                        <label for="dataParamSelect">Параметр для отображения:</label>
+                        <select id="dataParamSelect">
+                            {% for h in headers %}
+                                <option value="{{ loop.index0 }}">{{ h }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="chart-scroll" id="dataChartScroll">
+                        <canvas id="wellHistogram"></canvas>
+                    </div>
+                </div>
+
+                <script type="application/json" id="dataRowsData">{{ rows | tojson | safe }}</script>
+                <script type="application/json" id="dataHeadersData">{{ headers | tojson | safe }}</script>
+            {% elif not error %}
+                <p style="color: #888;">Загрузите CSV-файл для просмотра данных.</p>
+            {% endif %}
+
+        <!-- ========== Вкладка АНАЛИТИКА ========== -->
+        {% elif active_tab == 'analytics' %}
+            {% if no_data %}
+                <p style="color: #888;">Пожалуйста, подайте данные.</p>
+            {% else %}
+                <h2>Аналитика:</h2>
+
+                <div class="best-worst">
+                    <div class="result-block">
+                        <h3 style="color: gold;">Лучший результат (строка {{ best_index }})</h3>
+                        <ul>
+                            {% for key, value in best_row.items() %}
+                                <li><strong>{{ key }}:</strong> 
+                                    {% if loop.last %}<span style="font-weight: bold; font-size: 1.1em;">{{ value }}</span>
+                                    {% else %}{{ value }}{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="result-block">
+                        <h3 style="color: blue;">Средний результат</h3>
+                        <ul>
+                            {% for key, value in mean_row.items() %}
+                                <li><strong>{{ key }}:</strong> 
+                                    {% if loop.last %}<span style="font-weight: bold; font-size: 1.1em;">{{ value }}</span>
+                                    {% else %}{{ value }}{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="result-block">
+                        <h3 style="color: brown;">Худший результат (строка {{ worst_index }})</h3>
+                        <ul>
+                            {% for key, value in worst_row.items() %}
+                                <li><strong>{{ key }}:</strong> 
+                                    {% if loop.last %}<span style="font-weight: bold; font-size: 1.1em;">{{ value }}</span>
+                                    {% else %}{{ value }}{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="histograms-block">
+                    <div class="histograms-title">Зависимость параметра от качества</div>
+                    <div class="chart-selector">
+                        <label for="analyticsParamSelect">Параметр для оси X:</label>
+                        <select id="analyticsParamSelect">
+                            {% for h in headers %}
+                                {% if not loop.last %}
+                                    <option value="{{ loop.index0 }}">{{ h }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="chart-scroll" id="analyticsChartScroll">
+                        <canvas id="analyticsChart"></canvas>
+                    </div>
+                </div>
+
+                <script type="application/json" id="analyticsAllRowsData">{{ all_rows | tojson | safe }}</script>
+                <script type="application/json" id="analyticsHeadersData">{{ headers | tojson | safe }}</script>
+                <span id="analyticsTargetColData" style="display: none;">{{ target_col }}</span>
+            {% endif %}
+
+        <!-- ========== Вкладка ОБУЧЕНИЕ ========== -->
+        {% elif active_tab == 'train' %}
+            <h3>Обучение модели</h3>
+            {% if error %}
+                <div class="error-msg">{{ error }}</div>
+            {% endif %}
+            {% if success %}
+                <div class="success-msg">
+                    Модель успешно обучена. Номер модели: <strong>{{ model_id }}</strong>
+                </div>
+            {% endif %}
+
+            {% if not session_id %}
+                <p style="color: #888;">Сначала загрузите CSV-файл во вкладке «Данные».</p>
+            {% elif not models %}
+                <div class="error-msg">
+                    Список моделей недоступен. Проверьте, что внешний API работает 
+                    (<a href="http://5.129.248.80:8000/docs" target="_blank">http://5.129.248.80:8000/docs</a>).
+                </div>
+            {% else %}
+                <form id="trainForm" method="post" action="/train">
+                    <div class="train-controls">
+                        <div class="train-left">
+                            <label for="modelSelect">Выберите модель:</label>
+                            <select id="modelSelect" name="model_name">
+                                {% for m in models %}
+                                    <option value="{{ m }}">{{ m }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="train-right">
+                            <label>Диапазон строк:</label>
+                            <div class="range-slider">
+                                <input type="range" id="trainStart" name="train_start" min="1" max="{{ total_rows }}" value="1"
+                                       oninput="updateStats()">
+                                <input type="range" id="trainEnd" name="train_end" min="1" max="{{ total_rows }}" value="{{ total_rows }}"
+                                       oninput="updateStats()">
+                                <div class="range-values">
+                                    <span id="startLabel">1</span> – <span id="endLabel">{{ total_rows }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stats-table">
+                        <table>
+                            <tr><th>Всего строк</th><td id="totalRows">{{ total_rows }}</td></tr>
+                            <tr><th>Строк обучения</th><td id="trainRows">?</td></tr>
+                            <tr><th>Строк теста</th><td id="testRows">?</td></tr>
+                        </table>
+                    </div>
+                    <button type="submit" class="btn-train">Обучить модель</button>
+                </form>
+            {% endif %}
+
+        <!-- ========== Вкладка ПРЕДСКАЗАНИЯ ========== -->
+        {% elif active_tab == 'predict' %}
+            <h3>Предсказания модели</h3>
+            {% if error %}
+                <div class="error-msg">{{ error }}</div>
+            {% endif %}
+
+            {% if not model_trained %}
+                <p style="color: #888;">Модель ещё не обучена. Сначала обучите модель во вкладке «Обучение».</p>
+                <button class="btn-predict-disabled" disabled>Получить предсказание</button>
+            {% else %}
+                {% if not prediction_done %}
+                    <form method="post" action="/predict">
+                        <button type="submit" class="btn-predict">Получить предсказание</button>
+                    </form>
+                {% else %}
+                    <div class="predict-results">
+                        <h4>Факт vs Предсказание</h4>
+                        <div class="chart-scroll" id="scatterContainer">
+                            <canvas id="scatterChart"></canvas>
+                        </div>
+
+                        <h4 style="margin-top:30px;">Распределение ошибок (pred - true)</h4>
+                        <div class="chart-scroll" id="histContainer">
+                            <canvas id="errorHistChart"></canvas>
+                        </div>
+
+                        <div class="metrics-block">
+                            <table class="metrics-table">
+                                <tr><th>Средняя абсолютная ошибка (MAE)</th><td>{{ mae }}</td></tr>
+                                <tr><th>Корень из среднеквадратичной ошибки (RMSE)</th><td>{{ rmse }}</td></tr>
+                                <tr><th>Коэффициент детерминации (R²)</th><td>{{ r2 }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+        <!-- ========== Вкладка ЛОГИ ========== -->
+        {% elif active_tab == 'logs' %}
+            <h3>Действия пользователя на сайте</h3>
+            <form method="post" action="/logs/clear" style="display:inline;">
+                <button type="submit" class="btn-clear">Очистить логи</button>
+            </form>
+            <div class="table-wrapper">
+                <table class="data-table" id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>Номер операции</th>
+                            <th>Время</th>
+                            <th>Действие пользователя</th>
+                            <th>Ответ сайта</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if logs %}
+                            {% for log in logs %}
+                            <tr>
+                                <td>{{ log.id }}</td>
+                                <td>{{ log.time }}</td>
+                                <td>{{ log.action }}</td>
+                                <td>{{ log.response }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="4" style="color:#888;">Пока действий нет.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn-download" onclick="window.location.href='/logs/download'">Скачать логи в формате XLS</button>
+
+        {% else %}
+            <p style="color: #888;">Выберите раздел.</p>
+        {% endif %}
+    </div>
+
+    <!-- Футер (отображается только после старта) -->
+    <footer class="site-footer">
+        <div class="footer-left">
+            <p><strong>ООО "тмыв"</strong></p>
+            <p>Создатели: Ищенко, Аксенов, Бисембаев, Сидоренко</p>
+            <p>Контакты: 8-800-555-3-555</p>
+        </div>
+        <div class="footer-right">
+            <div class="footer-warning">
+                Внимание! При загрузке таблицы учитывайте, что вы можете использовать любое количество параметров, но последним параметром ОБЯЗАТЕЛЬНО идет параметр качества продукта, все загружаемые таблицы только в формате CSV.
+            </div>
+        </div>
+    </footer>
+    {% endif %}
+
+    <!-- Подключение Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Скрипт для гистограммы (вкладка "Данные") -->
+    {% if active_tab == 'data' and rows %}
+    <script>
+        const dataRows = JSON.parse(document.getElementById('dataRowsData').textContent);
+        const dataHeaders = JSON.parse(document.getElementById('dataHeadersData').textContent);
+        const dataParamSelect = document.getElementById('dataParamSelect');
+        const dataChartScroll = document.getElementById('dataChartScroll');
+        let dataChart;
+
+        function drawDataChart(columnIndex) {
+            const oldCanvas = document.getElementById('wellHistogram');
+            if (oldCanvas) oldCanvas.remove();
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = 'wellHistogram';
+            dataChartScroll.appendChild(newCanvas);
+            const ctx = newCanvas.getContext('2d');
+            const labels = dataRows.map((row, idx) => (idx + 1).toString());
+            const values = dataRows.map(row => {
+                const val = parseFloat(row[columnIndex]);
+                return isNaN(val) ? 0 : val;
+            });
+            const barWidth = 30;
+            const chartWidth = Math.max(labels.length * barWidth, 500);
+            newCanvas.style.width = chartWidth + 'px';
+            newCanvas.style.height = '300px';
+            dataChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: dataHeaders[columnIndex],
+                        data: values,
+                        backgroundColor: 'red',
+                        borderColor: 'darkred',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Номер скважины' }, ticks: { maxRotation: 90, minRotation: 45 } },
+                        y: { beginAtZero: true, title: { display: true, text: dataHeaders[columnIndex] } }
+                    },
+                    plugins: { legend: { display: true, labels: { color: 'black' } } }
+                }
+            });
+        }
+
+        drawDataChart(0);
+        dataParamSelect.addEventListener('change', function() {
+            drawDataChart(parseInt(this.value));
+        });
+    </script>
+    {% endif %}
+
+    <!-- Скрипт для аналитики -->
+    {% if active_tab == 'analytics' and not no_data %}
+    <script>
+        const analyticsAllRows = JSON.parse(document.getElementById('analyticsAllRowsData').textContent);
+        const analyticsHeaders = JSON.parse(document.getElementById('analyticsHeadersData').textContent);
+        const targetCol = document.getElementById('analyticsTargetColData').textContent;
+        const analyticsParamSelect = document.getElementById('analyticsParamSelect');
+        const analyticsChartScroll = document.getElementById('analyticsChartScroll');
+        let analyticsChart;
+
+        function linearRegression(points) {
+            const n = points.length;
+            if (n === 0) return null;
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+            points.forEach(p => {
+                sumX += p.x;
+                sumY += p.y;
+                sumXY += p.x * p.y;
+                sumX2 += p.x * p.x;
+            });
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+            return { slope, intercept };
+        }
+
+        function drawAnalyticsChart(columnIndex) {
+            const oldCanvas = document.getElementById('analyticsChart');
+            if (oldCanvas) oldCanvas.remove();
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = 'analyticsChart';
+            analyticsChartScroll.appendChild(newCanvas);
+            const ctx = newCanvas.getContext('2d');
+
+            const selectedParam = analyticsHeaders[columnIndex];
+            const points = analyticsAllRows.map(row => ({
+                x: parseFloat(row[selectedParam]),
+                y: parseFloat(row[targetCol])
+            })).filter(p => !isNaN(p.x) && !isNaN(p.y));
+
+            if (points.length === 0) {
+                console.warn('Нет точек для построения графика');
+                return;
+            }
+
+            const pointRadius = points.length > 50 ? 2 : 4;
+            const borderWidth = points.length > 50 ? 0.5 : 1;
+
+            const datasets = [{
+                label: `${selectedParam} vs ${targetCol}`,
+                data: points,
+                backgroundColor: '#e67e22',
+                pointRadius: pointRadius,
+                borderWidth: borderWidth,
+                borderColor: '#d35400'
+            }];
+
+            const reg = linearRegression(points);
+            if (reg) {
+                const xMin = Math.min(...points.map(p => p.x));
+                const xMax = Math.max(...points.map(p => p.x));
+                const trendPoints = [
+                    { x: xMin, y: reg.slope * xMin + reg.intercept },
+                    { x: xMax, y: reg.slope * xMax + reg.intercept }
+                ];
+                datasets.push({
+                    label: 'Линия тренда',
+                    data: trendPoints,
+                    type: 'line',
+                    borderColor: 'blue',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false,
+                    order: 1
+                });
+            }
+
+            analyticsChart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: selectedParam } },
+                        y: { title: { display: true, text: targetCol } }
+                    }
+                }
+            });
+        }
+
+        const defaultIndex = analyticsHeaders.length > 1 ? 0 : (analyticsHeaders.length - 1);
+        drawAnalyticsChart(defaultIndex);
+        analyticsParamSelect.addEventListener('change', function() {
+            drawAnalyticsChart(parseInt(this.value));
+        });
+    </script>
+    {% endif %}
+
+    <!-- Скрипт для обновления статистики обучения -->
+    {% if active_tab == 'train' and total_rows %}
+    <script>
+        function updateStats() {
+            const total = parseInt(document.getElementById('totalRows').textContent);
+            const start = parseInt(document.getElementById('trainStart').value);
+            const end = parseInt(document.getElementById('trainEnd').value);
+            document.getElementById('startLabel').textContent = start;
+            document.getElementById('endLabel').textContent = end;
+            const train = end - start + 1;
+            const test = total - train;
+            document.getElementById('trainRows').textContent = train;
+            document.getElementById('testRows').textContent = test;
+        }
+        window.addEventListener('load', updateStats);
+    </script>
+    {% endif %}
+
+    <!-- Скрипты для графиков предсказаний -->
+    {% if active_tab == 'predict' and prediction_done %}
+    <script id="yTrueData" type="application/json">{{ y_true | tojson | safe }}</script>
+    <script id="yPredData" type="application/json">{{ y_pred | tojson | safe }}</script>
+    <script id="errorsData" type="application/json">{{ errors | tojson | safe }}</script>
+    <script>
+        const yTrue = JSON.parse(document.getElementById('yTrueData').textContent);
+        const yPred = JSON.parse(document.getElementById('yPredData').textContent);
+        const errors = JSON.parse(document.getElementById('errorsData').textContent);
+        (function() {
+            const oldCanvas = document.getElementById('scatterChart');
+            if (oldCanvas) oldCanvas.remove();
+            const container = document.getElementById('scatterContainer');
+            const canvas = document.createElement('canvas');
+            canvas.id = 'scatterChart';
+            container.appendChild(canvas);
+            const dataPoints = yTrue.map((t, i) => ({x: t, y: yPred[i]}));
+            const allValues = yTrue.concat(yPred).filter(v => typeof v === 'number' && isFinite(v));
+            if (allValues.length === 0) return;
+            const minVal = Math.min(...allValues);
+            const maxVal = Math.max(...allValues);
+            new Chart(canvas, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Скважины',
+                        data: dataPoints,
+                        backgroundColor: '#3498db',
+                        pointRadius: 3
+                    }, {
+                        label: 'Идеальная линия',
+                        data: [{x: minVal, y: minVal}, {x: maxVal, y: maxVal}],
+                        type: 'line',
+                        borderColor: 'red',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Факт' } },
+                        y: { title: { display: true, text: 'Предсказание' } }
+                    }
+                }
+            });
+        })();
+        (function() {
+            const oldCanvas = document.getElementById('errorHistChart');
+            if (oldCanvas) oldCanvas.remove();
+            const container = document.getElementById('histContainer');
+            const canvas = document.createElement('canvas');
+            canvas.id = 'errorHistChart';
+            container.appendChild(canvas);
+            const numericErrors = errors.filter(e => typeof e === 'number' && isFinite(e));
+            if (numericErrors.length === 0) return;
+            const bins = 10;
+            const minErr = Math.min(...numericErrors);
+            const maxErr = Math.max(...numericErrors);
+            const binWidth = (maxErr - minErr) / bins || 1;
+            const counts = Array(bins).fill(0);
+            numericErrors.forEach(e => {
+                let idx = Math.floor((e - minErr) / binWidth);
+                if (idx >= bins) idx = bins - 1;
+                counts[idx]++;
+            });
+            const labels = Array.from({length: bins}, (_, i) => 
+                `${(minErr + i * binWidth).toFixed(2)} – ${(minErr + (i+1) * binWidth).toFixed(2)}`
+            );
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Частота',
+                        data: counts,
+                        backgroundColor: '#e67e22'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Ошибка (pred - true)' } },
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        })();
+    </script>
+    {% endif %}
+
+    <!-- Скрипт для автообновления логов -->
+    {% if active_tab == 'logs' %}
+    <script>
+        async function fetchLogs() {
+            const resp = await fetch('/logs/data');
+            const data = await resp.json();
+            const tbody = document.querySelector('#logsTable tbody');
+            if (tbody) {
+                let html = '';
+                if (data.logs.length === 0) {
+                    html = '<tr><td colspan="4" style="color:#888;">Пока действий нет.</td></tr>';
+                } else {
+                    data.logs.forEach(log => {
+                        html += `<tr><td>${log.id}</td><td>${log.time}</td><td>${log.action}</td><td>${log.response}</td></tr>`;
+                    });
+                }
+                tbody.innerHTML = html;
+            }
+        }
+        fetchLogs();
+        setInterval(fetchLogs, 5000);
+    </script>
+    {% endif %}
+</body>
+</html>

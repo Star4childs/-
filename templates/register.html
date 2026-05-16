@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Регистрация</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+        }
+        .register-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            width: 350px;
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #5a67d8; }
+        .error { color: red; margin-top: 10px; }
+        .success { color: green; margin-top: 10px; }
+        a { color: #667eea; text-decoration: none; display: block; margin-top: 15px; }
+        h2 { margin-bottom: 20px; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h2>📝 Регистрация</h2>
+        <input type="text" id="username" placeholder="Имя пользователя">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Пароль">
+        <button onclick="register()">Зарегистрироваться</button>
+        <div id="message"></div>
+        <a href="/">🔐 Уже есть аккаунт? Войти</a>
+    </div>
+
+    <script>
+        async function register() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const msgDiv = document.getElementById('message');
+            
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                msgDiv.className = 'success';
+                msgDiv.textContent = '✅ Регистрация успешна! Перенаправление на вход...';
+                setTimeout(() => { window.location.href = '/'; }, 2000);
+            } else {
+                msgDiv.className = 'error';
+                msgDiv.textContent = data.detail || 'Ошибка регистрации';
+            }
+        }
+        
+        // Если уже есть токен — сразу на сайт
+        if (localStorage.getItem('token')) {
+            window.location.href = '/site';
+        }
+    </script>
+</body>
+</html>
