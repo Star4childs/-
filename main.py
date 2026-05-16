@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 
 app = FastAPI()
 
-# Секретный ключ для сессий
+# Секретный ключ для сессий (замените на случайный перед деплоем)
 app.add_middleware(SessionMiddleware, secret_key="a7f1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0")
 
 # Папка для загрузок
@@ -26,15 +26,16 @@ templates = Jinja2Templates(directory="templates")
 # Внешний API
 EXTERNAL_API_BASE = "http://5.129.248.80:8000"
 
+# Файл с пользователями
+USERS_FILE = "users.xlsx"
+
 # ------------- Вспомогательные функции -------------
 def get_session_dir(session_id: str) -> str:
-    """Путь к папке сессии."""
     path = os.path.join(UPLOAD_DIR, session_id)
     os.makedirs(path, exist_ok=True)
     return path
 
 def log_action(session: dict, action: str, response: str):
-    """Добавление записи в лог сессии."""
     if "logs" not in session:
         session["logs"] = []
     session["logs"].append({
@@ -45,7 +46,6 @@ def log_action(session: dict, action: str, response: str):
     })
 
 async def fetch_models(client: httpx.AsyncClient) -> list[str]:
-    """Получить список доступных моделей с внешнего API."""
     try:
         resp = await client.get(f"{EXTERNAL_API_BASE}/models")
         resp.raise_for_status()
@@ -61,29 +61,132 @@ async def fetch_models(client: httpx.AsyncClient) -> list[str]:
 
 async def call_train_api(client: httpx.AsyncClient, model_name: str,
                          file_path: str, start_row: int, end_row: int) -> dict:
-    """Отправить запрос на обучение во внешний API."""
     with open(file_path, encoding='utf-8') as f:
         reader = csv.DictReader(f)
         train_data = [row for i, row in enumerate(reader) if start_row - 1 <= i < end_row]
-
     payload = {"model": model_name, "data": train_data}
     resp = await client.post(f"{EXTERNAL_API_BASE}/train", json=payload)
     resp.raise_for_status()
     return resp.json()
 
-# ------------- Маршруты -------------
+def read_users():
+    """Читает пользователей из Excel, возвращает список словарей"""
+    if not os.path.exists(USERS_FILE):
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Users"
+        ws.append(["ФИО", "Логин", "Пароль"])
+        wb.save(USERS_FILE)
+    users = []
+    wb = openpyxl.load_workbook(USERS_FILE)
+    ws = wb["Users"]
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if row[0] and row[1] and row[2]:
+            users.append({
+                "full_name": row[0],
+                "login": row[1],
+                "password": row[2]
+            })
+    wb.close()
+    return users
+
+def add_user(full_name: str, login: str, password: str):
+    """Добавляет нового пользователя в Excel"""
+    wb = openpyxl.load_workbook(USERS_FILE)
+    ws = wb["Users"]
+    ws.append([full_name, login, password])
+    wb.save(USERS_FILE)
+    wb.close()
+
+def check_login(login: str, password: str):
+    """Проверяет логин/пароль, возвращает имя пользователя или None"""
+    users = read_users()
+    for u in users:
+        if u["login"] == login and u["password"] == password:
+            return u["full_name"]
+    return None
+
+def require_login(request: Request):
+    """Если пользователь не залогинен — редирект на /auth"""
+    if not request.session.get("logged_in"):
+        return RedirectResponse(url="/auth")
+    return None
+
+# ------------- Маршруты (авторизация) -------------
 
 @app.get("/")
 async def home(request: Request):
+    if request.session.get("logged_in"):
+        return RedirectResponse(url="/data")
     return templates.TemplateResponse(request, "index.html", {"show_welcome": True})
 
 @app.post("/start")
 async def start(request: Request):
-    return RedirectResponse(url="/data", status_code=303)
+    # После приветствия отправляем на страницу входа/регистрации
+    return RedirectResponse(url="/auth", status_code=303)
 
-# Вкладка "Данные" (GET) – теперь показывает сохранённые данные
+@app.get("/auth")
+async def auth_page(request: Request):
+    if request.session.get("logged_in"):
+        return RedirectResponse(url="/data")
+    return templates.TemplateResponse(request, "auth.html", {
+        "request": request,
+        "error": None,
+        "success": None,   # ← добавить
+        "tab": "login"
+    })
+
+@app.post("/auth/register")
+async def auth_register(request: Request,
+                        full_name: str = Form(...),
+                        login: str = Form(...),
+                        password: str = Form(...)):
+    # Проверим, нет ли уже такого логина
+    users = read_users()
+    if any(u["login"] == login for u in users):
+        return templates.TemplateResponse(request, "auth.html", {
+    "request": request,
+    "error": "Логин уже занят",
+    "success": None,       # ← добавить
+    "tab": "register"
+})
+    add_user(full_name, login, password)
+    # После регистрации открываем вкладку "вход"
+    return templates.TemplateResponse(request, "auth.html", {
+        "request": request,
+        "success": "Регистрация прошла успешно. Войдите.",
+        "tab": "login"
+    })
+
+@app.post("/auth/login")
+async def auth_login(request: Request,
+                     login: str = Form(...),
+                     password: str = Form(...)):
+    full_name = check_login(login, password)
+    if full_name:
+        request.session["logged_in"] = True
+        request.session["full_name"] = full_name
+        return RedirectResponse(url="/data", status_code=303)
+    else:
+        return templates.TemplateResponse(request, "auth.html", {
+    "request": request,
+    "error": "Неверный логин или пароль",
+    "success": None,       # ← добавить
+    "tab": "login"
+})
+
+@app.post("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/", status_code=303)
+
+# ------------- Защищённые маршруты (вкладки) -------------
+
 @app.get("/data")
 async def data_get(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     session_id = session.get("session_id")
     context = {"active_tab": "data"}
@@ -117,9 +220,11 @@ async def data_get(request: Request):
                 pass
     return templates.TemplateResponse(request, "index.html", context)
 
-# Загрузка CSV (POST)
 @app.post("/data")
 async def data_post(request: Request, file: UploadFile = File(...), n: int = Form(5)):
+    r = require_login(request)
+    if r: return r
+
     if not file.filename.endswith('.csv'):
         log_action(request.session, f"Загрузка CSV-файла {file.filename}", "Ошибка: неверный формат")
         return templates.TemplateResponse(request, "index.html", {
@@ -183,10 +288,11 @@ async def data_post(request: Request, file: UploadFile = File(...), n: int = For
         "session_id": session_id
     })
 
-# Вкладка "Обучение" (GET)
-# Вкладка "Аналитика" (GET)
 @app.get("/analytics")
 async def analytics_get(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     session_id = session.get("session_id")
     context = {"active_tab": "analytics"}
@@ -223,7 +329,6 @@ async def analytics_get(request: Request):
 
         all_rows = []
         for row in reader:
-            # Преобразуем все значения в числа, если возможно, чтобы корректно находить min/max
             processed_row = {}
             for k, v in row.items():
                 try:
@@ -236,28 +341,18 @@ async def analytics_get(request: Request):
             context["no_data"] = True
             return templates.TemplateResponse(request, "index.html", context)
 
-        # Целевой столбец (последний)
         target_col = headers[-1]
-
-        # Поиск лучшей и худшей строки (по значению целевого столбца)
-        best_row = max(all_rows, key=lambda r: r[target_col])
-        worst_row = min(all_rows, key=lambda r: r[target_col])
-        best_index = all_rows.index(best_row) + 1   # номер строки с учётом заголовка (строка данных с 2-й)
-        worst_index = all_rows.index(worst_row) + 1
-
-                # Поиск лучшей и худшей строки (по значению целевого столбца)
         best_row = max(all_rows, key=lambda r: r[target_col])
         worst_row = min(all_rows, key=lambda r: r[target_col])
         best_index = all_rows.index(best_row) + 1
         worst_index = all_rows.index(worst_row) + 1
 
-        # === НОВАЯ ЧАСТЬ: Средний результат ===
+        # Средние значения
         mean_row = {}
         for key in headers:
             try:
                 mean_row[key] = round(sum(float(r[key]) for r in all_rows) / len(all_rows), 4)
             except (ValueError, TypeError):
-                # Если столбец не числовой – берём первое значение
                 mean_row[key] = all_rows[0][key]
 
         context.update({
@@ -269,15 +364,19 @@ async def analytics_get(request: Request):
             "best_index": best_index,
             "worst_row": worst_row,
             "worst_index": worst_index,
-            "mean_row": mean_row,          # ← добавили средние данные
+            "mean_row": mean_row,
         })
 
     except Exception:
         context["no_data"] = True
 
     return templates.TemplateResponse(request, "index.html", context)
+
 @app.get("/train")
 async def train_get(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     session_id = session.get("session_id")
     models = []
@@ -297,12 +396,14 @@ async def train_get(request: Request):
         "total_rows": total_rows
     })
 
-# Запуск обучения (POST)
 @app.post("/train")
 async def train_post(request: Request,
                      model_name: str = Form(...),
                      train_start: int = Form(...),
                      train_end: int = Form(...)):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     session_id = session.get("session_id")
     if not session_id:
@@ -325,7 +426,8 @@ async def train_post(request: Request,
             result = await call_train_api(client, model_name, file_path, train_start, train_end)
             model_id = result.get("model_id")
             session["model_id"] = model_id
-            log_action(session, f"Обучение модели {model_name} (строки {train_start}-{train_end})", f"ОК, model_id={model_id}")
+            log_action(session, f"Обучение модели {model_name} (строки {train_start}-{train_end})",
+                       f"ОК, model_id={model_id}")
             return templates.TemplateResponse(request, "index.html", {
                 "active_tab": "train",
                 "success": True,
@@ -340,9 +442,11 @@ async def train_post(request: Request,
                 "models": await fetch_models(client)
             })
 
-# Вкладка "Предсказания" (GET)
 @app.get("/predict")
 async def predict_get(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     model_trained = "model_id" in session
     return templates.TemplateResponse(request, "index.html", {
@@ -351,9 +455,11 @@ async def predict_get(request: Request):
         "model_id": session.get("model_id", "")
     })
 
-# Получение предсказаний (POST)
 @app.post("/predict")
 async def predict_post(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     model_id = session.get("model_id")
     if not model_id:
@@ -435,9 +541,11 @@ async def predict_post(request: Request):
         "model_id": model_id
     })
 
-# Вкладка "Логи" (GET)
 @app.get("/logs")
-def logs(request: Request):
+async def logs(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     logs_list = session.get("logs", [])
     return templates.TemplateResponse(request, "index.html", {
@@ -445,16 +553,28 @@ def logs(request: Request):
         "logs": logs_list
     })
 
-# Эндпоинт для получения логов (для AJAX)
 @app.get("/logs/data")
 async def get_logs_data(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     logs_list = session.get("logs", [])
     return {"logs": logs_list}
 
-# Скачивание логов в Excel
+@app.post("/logs/clear")
+async def clear_logs(request: Request):
+    r = require_login(request)
+    if r: return r
+
+    request.session["logs"] = []
+    return RedirectResponse(url="/logs", status_code=303)
+
 @app.get("/logs/download")
 async def download_logs(request: Request):
+    r = require_login(request)
+    if r: return r
+
     session = request.session
     logs_list = session.get("logs", [])
     wb = openpyxl.Workbook()
@@ -478,10 +598,6 @@ async def download_logs(request: Request):
     stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
-    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    return StreamingResponse(stream,
+                             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              headers={"Content-Disposition": "attachment; filename=logs.xlsx"})
-@app.post("/logs/clear")
-async def clear_logs(request: Request):
-    session = request.session
-    session["logs"] = []
-    return RedirectResponse(url="/logs", status_code=303)

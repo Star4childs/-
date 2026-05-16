@@ -10,7 +10,7 @@
             max-width: 1100px;
             margin: 40px auto;
             padding: 0 20px;
-            background: #1a2a3a;
+            background: #1a2a3a;   /* тёмно-синий фон */
             color: #eee;
         }
         h1 {
@@ -105,6 +105,7 @@
             margin-bottom: 15px;
         }
 
+        /* Блок с результатами и гистограммой */
         .result-block {
             background: #e9ecef;
             border-radius: 12px;
@@ -156,6 +157,7 @@
             display: block;
         }
 
+        /* Стили вкладки Обучение */
         .success-msg {
             background: #d4edda;
             color: #155724;
@@ -255,6 +257,7 @@
             background: #218838;
         }
 
+        /* Кнопка очистки логов */
         .btn-clear {
             background: #dc3545;
             color: white;
@@ -269,6 +272,7 @@
             background: #c82333;
         }
 
+        /* Экран приветствия */
         .welcome-overlay {
             position: fixed;
             top: 0;
@@ -311,48 +315,31 @@
         .btn-start:hover {
             background: #f0f0f0;
         }
-
-        /* Стили футера */
-        .site-footer {
-            background: #000000;
-            color: #ffffff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 300px;
-            margin-top: 30px;
-            border-radius: 8px;
-            font-size: 0.9em;
-        }
-        .footer-left p {
-            margin: 5px 0;
-        }
-        .footer-warning {
-            background: #555555;
-            color: rgb(255, 255, 255);
-            padding: 10px 15px;
-            border-radius: 6px;
-            max-width: 400px;   
-            text-align: left;
-        }
     </style>
 </head>
 <body>
-    {% if show_welcome %}
-    <!-- Экран приветствия -->
-    <div class="welcome-overlay">
-        <div class="welcome-container">
-            <h1 class="welcome-title">Приветствую!</h1>
-            <p class="welcome-text">Я бот-предсказатель качества товарного продукта. Нажмите кнопку, чтобы начать</p>
-            <form method="post" action="/start">
-                <button type="submit" class="btn-start">Начать!</button>
-            </form>
-        </div>
+{% if show_welcome %}
+<!-- Экран приветствия -->
+<div class="welcome-overlay">
+    <div class="welcome-container">
+        <h1 class="welcome-title">Приветствую!</h1>
+        <p class="welcome-text">Я бот-предсказатель качества товарного продукта. Нажмите кнопку, чтобы начать</p>
+        <form method="post" action="/start">
+            <button type="submit" class="btn-start">Начать!</button>
+        </form>
     </div>
-    {% else %}
-    <!-- Основное приложение (показывается после старта) -->
-    <h1>Предсказание качества товарного продукта</h1>
+</div>
+{% else %}
+<!-- Основное приложение -->
+<div style="position: relative;">
+    <!-- Кнопка выхода -->
+    <form action="/logout" method="post" style="position: absolute; top: 10px; right: 10px; z-index: 100;">
+        <button type="submit" style="background: white; color: #1a2a3a; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
+            Выход
+        </button>
+    </form>
 
+    <h1>Предсказание качества товарного продукта</h1>
     <div class="tabs">
         <a href="/data" class="tab {% if active_tab == 'data' %}active{% endif %}">Данные</a>
         <a href="/analytics" class="tab {% if active_tab == 'analytics' %}active{% endif %}">Аналитика</a>
@@ -372,8 +359,10 @@
                 <form method="post" action="/data" enctype="multipart/form-data">
                     <label for="file">Загрузите CSV-файл:</label>
                     <input type="file" id="file" name="file" accept=".csv" required>
+
                     <label for="n">Количество строк для отображения:</label>
                     <input type="number" id="n" name="n" value="{{ n if n else 5 }}" min="1">
+
                     <button type="submit">Загрузить и показать</button>
                 </form>
             </div>
@@ -416,6 +405,7 @@
                     </div>
                 </div>
 
+                <!-- Скрытые данные для безопасной передачи JSON во вкладку "Данные" -->
                 <script type="application/json" id="dataRowsData">{{ rows | tojson | safe }}</script>
                 <script type="application/json" id="dataHeadersData">{{ headers | tojson | safe }}</script>
             {% elif not error %}
@@ -482,6 +472,7 @@
                     </div>
                 </div>
 
+                <!-- Скрытые данные для безопасной передачи JSON во вкладку "Аналитика" -->
                 <script type="application/json" id="analyticsAllRowsData">{{ all_rows | tojson | safe }}</script>
                 <script type="application/json" id="analyticsHeadersData">{{ headers | tojson | safe }}</script>
                 <span id="analyticsTargetColData" style="display: none;">{{ target_col }}</span>
@@ -618,21 +609,6 @@
         {% endif %}
     </div>
 
-    <!-- Футер (отображается только после старта) -->
-    <footer class="site-footer">
-        <div class="footer-left">
-            <p><strong>ООО "тмыв"</strong></p>
-            <p>Создатели: Ищенко, Аксенов, Бисембаев, Сидоренко</p>
-            <p>Контакты: 8-800-555-3-555</p>
-        </div>
-        <div class="footer-right">
-            <div class="footer-warning">
-                Внимание! При загрузке таблицы учитывайте, что вы можете использовать любое количество параметров, но последним параметром ОБЯЗАТЕЛЬНО идет параметр качества продукта, все загружаемые таблицы только в формате CSV.
-            </div>
-        </div>
-    </footer>
-    {% endif %}
-
     <!-- Подключение Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -748,6 +724,7 @@
                 borderColor: '#d35400'
             }];
 
+            // Линия тренда
             const reg = linearRegression(points);
             if (reg) {
                 const xMin = Math.min(...points.map(p => p.x));
@@ -815,7 +792,7 @@
     <script>
         const yTrue = JSON.parse(document.getElementById('yTrueData').textContent);
         const yPred = JSON.parse(document.getElementById('yPredData').textContent);
-        const errors = JSON.parse(document.getElementById('errorsData').textContent);
+        const errors = JSON.parse(document.getElementById('errorsData').textContent);       
         (function() {
             const oldCanvas = document.getElementById('scatterChart');
             if (oldCanvas) oldCanvas.remove();
@@ -921,6 +898,7 @@
         fetchLogs();
         setInterval(fetchLogs, 5000);
     </script>
+    {% endif %}
     {% endif %}
 </body>
 </html>

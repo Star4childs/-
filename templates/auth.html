@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход или регистрация</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a2a3a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .auth-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            width: 350px;
+        }
+        .avatar {
+            width: 80px;
+            height: 80px;
+            background: #ecf0f1;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: #7f8c8d;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: #bdc3c7;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            color: #2c3e50;
+            transition: 0.2s;
+        }
+        .tab-btn:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+        .tab-btn:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+        .tab-btn.active {
+            background: #3498db;
+            color: white;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .btn-submit {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-submit:hover {
+            background: #219a52;
+        }
+        .error-msg {
+            color: red;
+            margin-bottom: 10px;
+        }
+        .success-msg {
+            color: green;
+            margin-bottom: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="avatar">👤</div>
+
+        <div class="tabs">
+            <button class="tab-btn {% if tab == 'login' or not tab %}active{% endif %}" id="tabLogin" onclick="switchTab('login')">Вход</button>
+            <button class="tab-btn {% if tab == 'register' %}active{% endif %}" id="tabRegister" onclick="switchTab('register')">Регистрация</button>
+        </div>
+
+        {% if error %}
+            <div class="error-msg">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+            <div class="success-msg">{{ success }}</div>
+        {% endif %}
+
+        <!-- Форма входа -->
+        <form id="loginForm" class="{% if tab == 'register' %}hidden{% endif %}" method="post" action="/auth/login">
+            <div class="form-group">
+                <input type="text" name="login" placeholder="Логин" required>
+            </div>
+            <div class="form-group">
+                <input type="password" name="password" placeholder="Пароль" required>
+            </div>
+            <button type="submit" class="btn-submit">Войти</button>
+        </form>
+
+        <!-- Форма регистрации -->
+        <form id="registerForm" class="{% if tab == 'login' or not tab %}hidden{% endif %}" method="post" action="/auth/register">
+            <div class="form-group">
+                <input type="text" name="full_name" placeholder="ФИО" required>
+            </div>
+            <div class="form-group">
+                <input type="text" name="login" placeholder="Логин" required>
+            </div>
+            <div class="form-group">
+                <input type="password" name="password" placeholder="Пароль" required>
+            </div>
+            <button type="submit" class="btn-submit">Готово</button>
+        </form>
+    </div>
+
+        <script>
+        function switchTab(tab) {
+            document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+            document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+            document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+            document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+        }
+        // Инициализация активной вкладки при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            switchTab('{{ tab or "login" }}');
+        });
+    </script>
+</body>
+</html>
